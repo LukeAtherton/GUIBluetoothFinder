@@ -1,0 +1,10 @@
+*.exe
+*.dll
+*.reg
+*.bat
+*.cab
+*.ini
+*.pfx
+obj/
+publish/
+Release/

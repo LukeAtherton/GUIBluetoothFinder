@@ -1,0 +1,26 @@
+<device-movements>
+	<device-movement>
+		<device-bluetooth-id>10</device-bluetooth-id>
+		<updated-at>20100929 9:27:00</updated-at>
+		<node>node1</node>
+		<type>arrive</type>
+	</device-movement>
+	<device-movement>
+		<device-bluetooth-id>10</device-bluetooth-id>
+		<updated-at>20100929 9:28:00</updated-at>
+		<node>node1</node>
+		<type>depart</type>
+	</device-movement>
+	<device-movement>
+		<device-bluetooth-id>10</device-bluetooth-id>
+		<updated-at>20100929 9:37:00</updated-at>
+		<node>node2</node>
+		<type>arrive</type>
+	</device-movement>
+	<device-movement>
+		<device-bluetooth-id>10</device-bluetooth-id>
+		<updated-at>20100929 9:32:00</updated-at>
+		<node>node3</node>
+		<type>arrive</type>
+	</device-movement>
+</device-movements>
