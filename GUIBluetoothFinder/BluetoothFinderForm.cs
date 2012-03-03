@@ -15,22 +15,19 @@ using System.Xml;
 using System.Xml.Xsl;
 using System.Xml.Linq;
 
-namespace GUIBluetoothFinder
-{
-    public partial class BluetoothFinderForm : Form
-    {
-        private DataSet ds;
-        private DataTable dt;
+namespace GUIBluetoothFinder {
 
-        public BluetoothFinderForm()
-        {
+    public partial class BluetoothFinderForm : Form {
+        private DataSet dataSet;
+        private DataTable dataTable;
+
+        public BluetoothFinderForm() {
             InitializeComponent();
         }
 
-        private void Form1_Load(object sender, EventArgs e)
-        {
-            ds = new DataSet();
-            dt = new DataTable("Device");
+        private void bluetoothFinderForm_Load(object sender, EventArgs e) {
+            dataSet = new DataSet();
+            dataTable = new DataTable("Device");
 
             // Create a new DataTable and set two DataColumn objects as primary keys.
             DataColumn[] keys = new DataColumn[1];
@@ -42,30 +39,42 @@ namespace GUIBluetoothFinder
             column.ColumnName = "Device Name";
 
             // Add the column to the DataTable.Columns collection.
-            dt.Columns.Add(column);
+            dataTable.Columns.Add(column);
+
+            // Create column 3.
+            column = new DataColumn();
+            column.DataType = System.Type.GetType("System.String");
+            column.ColumnName = "Phone Number";
+
+            // Add the column to the DataTable.Columns collection.
+            dataTable.Columns.Add(column);
 
             // Create column 2 and add it to the array.
             column = new DataColumn();
             column.DataType = System.Type.GetType("System.String");
             column.ColumnName = "MAC Address";
-            dt.Columns.Add(column);
+            column.ReadOnly = true;
+
+            dataTable.Columns.Add(column);
 
             // Add the column to the array.
             keys[0] = column;
 
-            // Create column 3.
+            // Create column 2 and add it to the array.
             column = new DataColumn();
-            column.DataType = System.Type.GetType("System.String");
-            column.ColumnName = "Device Type";
+            column.DataType = System.Type.GetType("System.Boolean");
+            column.ColumnName = "Synced?";
 
-            // Add the column to the DataTable.Columns collection.
-            dt.Columns.Add(column);
+            dataTable.Columns.Add(column);
 
             // Set the PrimaryKeys property to the array.
-            dt.PrimaryKey = keys;
+            dataTable.PrimaryKey = keys;
 
-            ds.Tables.Add(dt);
-            dataGridView1.DataSource = ds.Tables[0];
+            // add a ColumnChanged event handler for the table.
+            dataTable.ColumnChanged += new DataColumnChangeEventHandler(column_Changed);
+
+            dataSet.Tables.Add(dataTable);
+            dataGridView1.DataSource = dataSet.Tables[0];
 
             // Create a new XmlDocument  
             XmlDocument doc = new XmlDocument();
@@ -76,9 +85,11 @@ namespace GUIBluetoothFinder
             // Get nodes
             XmlNodeList nodes = doc.SelectNodes("/devices/device");
 
-            foreach (XmlNode node in nodes)
-            {
-                dt.Rows.Add(node.SelectSingleNode("device-name").InnerText, node.SelectSingleNode("bluetooth-id").InnerText, "");                               
+            foreach (XmlNode node in nodes) {
+                dataTable.Rows.Add(node.SelectSingleNode("device-name").InnerText, 
+                            node.SelectSingleNode("local-device-number").InnerText, 
+                            node.SelectSingleNode("bluetooth-id").InnerText,
+                            true);                               
             }
 
             buildTree();
@@ -88,28 +99,28 @@ namespace GUIBluetoothFinder
         {
             DiscoDevicesAsync();
             btnFind.Enabled = false;
+            btnSend.Enabled = false;
+            btnClear.Enabled = false;
         }
 
-        public void DiscoDevicesAsync()
-        {
-            BluetoothComponent bco = new BluetoothComponent();
-            bco.DiscoverDevicesProgress += HandleDiscoDevicesProgress;
-            bco.DiscoverDevicesComplete += HandleDiscoDevicesComplete;
-            bco.DiscoverDevicesAsync(255, true, true, true, false, 99);
+        public void DiscoDevicesAsync() {
+
+            BluetoothComponent btComponent = new BluetoothComponent();
+            btComponent.DiscoverDevicesProgress += HandleDiscoDevicesProgress;
+            btComponent.DiscoverDevicesComplete += HandleDiscoDevicesComplete;
+            btComponent.DiscoverDevicesAsync(255, true, true, true, false, 99);
         }
 
-        private void HandleDiscoDevicesProgress(object sender, DiscoverDevicesEventArgs e)
-        {
-            foreach (BluetoothDeviceInfo device in e.Devices)
-            {
+        private void HandleDiscoDevicesProgress(object sender, DiscoverDevicesEventArgs e) {
+
+            foreach (BluetoothDeviceInfo device in e.Devices) {
+
                 object[] findTheseVals = new object[1];
                 findTheseVals[0] = device.DeviceAddress.ToString();
-                DataRow foundRow = dt.Rows.Find(findTheseVals);
-                if (foundRow == null)
-                {
-                    dt.Rows.Add(device.DeviceName, device.DeviceAddress.ToString(), device.ClassOfDevice);
-                    WebRequest request = WebRequest.Create("http://teethtracker.heroku.com/devices/new?bluetooth_id=" + device.DeviceAddress.ToString() + "&name=" + device.DeviceName + "&type=" + device.ClassOfDevice.Device.ToString());
-                    request.BeginGetResponse(new AsyncCallback(FinishWebRequest), request);
+                DataRow foundRow = dataTable.Rows.Find(findTheseVals);
+
+                if (foundRow == null) {
+                    dataTable.Rows.Add(device.DeviceName, "", device.DeviceAddress.ToString());
                 }
             }
         }
@@ -220,33 +231,69 @@ namespace GUIBluetoothFinder
                 // type of node, whether attribute values are required, and so forth.
                 inTreeNode.Text = (inXmlNode.OuterXml).Trim();
             }
-        } 
+        }
+
+        private void FinishAddRequest(IAsyncResult result) {
+
+            object[] returnedParams = (object[])result.AsyncState;
+            HttpWebRequest request = (HttpWebRequest)returnedParams[0];
+            string id = (string)returnedParams[1];
+
+            object[] findTheseVals = new object[1];
+            findTheseVals[0] = id;
+            DataRow foundRow = dataTable.Rows.Find(findTheseVals);
+
+            if (foundRow != null) {
+                foundRow.SetField(3, true);
+            }
+        }
 
         private void FinishWebRequest(IAsyncResult result)
         {
             HttpWebResponse response = (result.AsyncState as HttpWebRequest).EndGetResponse(result) as HttpWebResponse;
         }
 
-        private void HandleDiscoDevicesComplete(object sender, DiscoverDevicesEventArgs e)
-        {
-            if (e.Cancelled)
-            {
+        private void HandleDiscoDevicesComplete(object sender, DiscoverDevicesEventArgs e) {
+            if (e.Cancelled) {
                 Console.WriteLine("DiscoDevicesAsync cancelled.");
-            }
-            else if (e.Error != null)
-            {
+            } else if (e.Error != null) {
                 Console.WriteLine("DiscoDevicesAsync error: {0}.", e.Error.Message);
-            }
-            else
-            {
+            } else {
                 Console.WriteLine("DiscoDevicesAsync complete found {0} devices.", e.Devices.Length);
             }
             btnFind.Enabled = true;
+            btnSend.Enabled = true;
+            btnClear.Enabled = true;
         }
 
-        private void btnRefresh_Click(object sender, EventArgs e)
-        {
+        private void btnRefresh_Click(object sender, EventArgs e) {
             buildTree();
+        }
+
+        private void btnSend_Click(object sender, EventArgs e) {
+            foreach (DataRow row in dataTable.Rows) {
+
+                WebRequest request = WebRequest.Create("http://teethtracker.heroku.com/devices/new?"
+                                                        + "bluetooth_id=" + row[2]
+                                                        + "&name=" + row[0]
+                                                        + "&number=" + row[1]
+                                                       );
+
+                request.BeginGetResponse(new AsyncCallback(FinishAddRequest), new object[] { request, row[2].ToString() });
+            }
+        }
+
+        private void btnClear_Click(object sender, EventArgs e) {
+            dataTable.Clear();
+            WebRequest request = WebRequest.Create("http://teethtracker.heroku.com/clear-database");
+
+            request.BeginGetResponse(new AsyncCallback(FinishWebRequest), request);
+        }
+
+        private static void column_Changed(object sender, DataColumnChangeEventArgs e) {
+            if (e.Column.ColumnName == "Phone Number") {
+                e.Row[3] = false;
+            }
         }
        
     }
